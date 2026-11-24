@@ -6,6 +6,7 @@ import {
   resolveValue,
   type CuttleskinCardConfig,
 } from './card-config';
+import { bindElementActions } from './element-actions';
 import { INTEGRATION_ENABLED } from './features';
 import type { HomeAssistant } from './hass';
 import { errorText, loadIntegrationGraphic } from './integration';
@@ -52,8 +53,8 @@ const STYLE = `
 `;
 
 /**
- * Dashboard card `custom:cuttleskin-card`: loads a cuttleskin graphic and sets its variables from
- * entity states.
+ * Dashboard card `custom:cuttleskin-card`: loads a cuttleskin graphic, sets its variables from
+ * entity states and runs Home Assistant actions on taps of its named elements.
  *
  * Lifecycle (driven by Home Assistant): `setConfig` with the YAML configuration, then `hass` on
  * every state change in the whole system.
@@ -90,6 +91,8 @@ export class CuttleskinCard extends HTMLElement {
   });
   /** Last value set per variable; unchanged values are not set again (that restarts transitions). */
   readonly #lastValues = new Map<string, unknown>();
+  /** Removes the actions bound to the elements of the graphic. */
+  #unbindActions: (() => void) | undefined;
 
   /** The loaded graphic, e.g. for tests; `undefined` while loading or after an error. */
   get graphic(): Graphic | undefined {
@@ -114,8 +117,19 @@ export class CuttleskinCard extends HTMLElement {
       void this.#load(config);
     } else {
       this.#applyAspectRatio();
+      this.#bindActions();
       this.#update();
     }
+  }
+
+  /** Connects the elements named in `actions` with Home Assistant, replacing earlier bindings. */
+  #bindActions(): void {
+    this.#unbindActions?.();
+    this.#unbindActions = undefined;
+    const graphic = this.#graphic;
+    const actions = this.#config?.actions;
+    if (!graphic || !actions) return;
+    this.#unbindActions = bindElementActions(graphic, actions, this);
   }
 
   set hass(hass: HomeAssistant) {
@@ -216,6 +230,8 @@ export class CuttleskinCard extends HTMLElement {
   async #load(config: CuttleskinCardConfig): Promise<void> {
     const token = {};
     this.#loadToken = token;
+    this.#unbindActions?.();
+    this.#unbindActions = undefined;
     this.#graphic?.destroy();
     this.#graphic = undefined;
     this.#svgAspectRatio = undefined;
@@ -259,6 +275,7 @@ export class CuttleskinCard extends HTMLElement {
     this.#graphic = graphic;
     this.#applyAspectRatio();
     this.#fit();
+    this.#bindActions();
     this.#update();
   }
 

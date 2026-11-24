@@ -98,6 +98,7 @@ variables:
 | `assets`       | no       | URL of the image folder (relative to the SVG); default: `assets/` next to the SVG    |
 | `aspect_ratio` | no       | aspect ratio of the card area; default: from the `viewBox` of the graphic            |
 | `variables`    | no       | name of the cuttleskin variable → entity or `{ entity, attribute?, map?, formula? }` |
+| `actions`      | no       | element name of the graphic → actions on tap, hold and double tap                    |
 
 Without `svg` and `config` (new card, preview in the card picker) the card shows the cuttleskin
 logo and a hint.
@@ -136,6 +137,40 @@ variables:
 If the value is not a number (e.g. `unknown`) or the result is not finite, the graphic keeps its
 last value. The formula is not evaluated as JavaScript; nothing beyond the table is possible.
 
+### Actions on elements
+
+Elements that the graphic reports events for (view **Events** in the cuttleskin editor) can run
+Home Assistant actions, like the buttons of other cards. The card addresses them by their name in
+the graphic, not by the SVG ID:
+
+```yaml
+actions:
+  livingRoomLamp:
+    entity: light.living_room
+    tap_action:
+      action: toggle
+    hold_action:
+      action: more-info
+  garageDoor:
+    tap_action:
+      action: perform-action
+      perform_action: cover.toggle
+      target:
+        entity_id: cover.garage
+    double_tap_action:
+      action: navigate
+      navigation_path: /dashboard-garage
+```
+
+- `tap_action`, `hold_action` (pressed for half a second) and `double_tap_action` take the usual
+  Home Assistant actions: `toggle`, `more-info`, `perform-action`, `navigate`, `url`, `none`.
+- `entity` is used by actions without their own entity, e.g. `toggle` and `more-info`.
+- Elements with an action show the hand cursor. A name without an element in the graphic is
+  ignored; an element without a name in the graphic is addressed by its ID.
+- The visual editor shows a section "Actions: <name>" per element, with the entity and the
+  gestures whose events the graphic reports: `click` → tap, `pointerdown` → hold,
+  `dblclick` → double tap.
+
 ### Size and values
 
 - The graphic is always zoomed to fit the card and fitted again on every size change.
@@ -146,7 +181,8 @@ last value. The formula is not evaluated as JavaScript; nothing beyond the table
 
 ## Limits
 
-- The graphic is display only; clicks trigger no actions.
+- Only elements with an entry under `actions` react to taps; the rest of the graphic is display
+  only.
 - The visual editor uses Home Assistant's internal `ha-form` element. If it is not available, use
   the code editor.
 - The graphic is inserted into the Home Assistant interface (inside the card's shadow DOM). Only

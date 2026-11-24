@@ -17,6 +17,26 @@ export interface VariableSource {
   readonly formula?: string;
 }
 
+/** Gestures on an element of the graphic, as in the cards of Home Assistant. */
+export const ACTION_GESTURES = ['tap_action', 'hold_action', 'double_tap_action'] as const;
+export type ActionGesture = (typeof ACTION_GESTURES)[number];
+
+/**
+ * An action of Home Assistant, e.g. `{ action: 'toggle' }` or
+ * `{ action: 'perform-action', perform_action: 'light.turn_on', target: … }`. Home Assistant
+ * checks and runs it; the card only passes it on.
+ */
+export type HassActionConfig = Readonly<Record<string, unknown>> & { readonly action: string };
+
+/** What happens on an element of the graphic, addressed by its name in the graphic. */
+export interface ElementActions {
+  /** Entity for actions without their own, e.g. `toggle` and `more-info`. */
+  readonly entity?: string;
+  readonly tap_action?: HassActionConfig;
+  readonly hold_action?: HassActionConfig;
+  readonly double_tap_action?: HassActionConfig;
+}
+
 /**
  * Card configuration as written in the dashboard YAML: either `graphic` (loaded through the
  * cuttleskin integration) or `svg` and `config` (URLs of the files).
@@ -37,6 +57,8 @@ export interface CuttleskinCardConfig {
   readonly aspect_ratio?: number;
   /** Variable name -> source. */
   readonly variables?: Readonly<Record<string, VariableSource>>;
+  /** Element name in the graphic (`elements[].name`, or the ID) -> actions on it. */
+  readonly actions?: Readonly<Record<string, ElementActions>>;
 }
 
 /** Whether the card has a graphic to show; without one it shows the logo and a hint. */
@@ -103,6 +125,25 @@ function parseSource(name: string, value: unknown): VariableSource {
   };
 }
 
+function parseElementActions(name: string, value: unknown): ElementActions {
+  if (!isRecord(value)) throw configError('actionsInvalid');
+  const { entity } = value;
+  if (entity !== undefined && entity !== null && (typeof entity !== 'string' || entity === '')) {
+    throw configError('actionEntityInvalid', { name });
+  }
+  const actions: Partial<Record<ActionGesture, HassActionConfig>> = {};
+  for (const gesture of ACTION_GESTURES) {
+    const action = value[gesture];
+    // The visual editor writes `null` for cleared fields
+    if (action === undefined || action === null) continue;
+    if (!isRecord(action) || typeof action.action !== 'string' || action.action === '') {
+      throw configError('actionInvalid', { name, gesture });
+    }
+    actions[gesture] = action as HassActionConfig;
+  }
+  return { ...(typeof entity === 'string' ? { entity } : {}), ...actions };
+}
+
 /**
  * Checks the YAML configuration. Throws an error with a message for the user; Home Assistant shows
  * it instead of the card.
@@ -163,6 +204,14 @@ export function parseCardConfig(input: unknown): CuttleskinCardConfig {
     variables[name] = parseSource(name, value);
   }
 
+  const rawActions = input.actions ?? {};
+  if (!isRecord(rawActions)) throw configError('actionsInvalid');
+  const actions: Record<string, ElementActions> = {};
+  for (const [name, value] of Object.entries(rawActions)) {
+    if (value === null) continue;
+    actions[name] = parseElementActions(name, value);
+  }
+
   return {
     type: typeof input.type === 'string' ? input.type : 'custom:cuttleskin-card',
     ...source,
@@ -171,6 +220,7 @@ export function parseCardConfig(input: unknown): CuttleskinCardConfig {
       : {}),
     ...(typeof aspectRatio === 'number' ? { aspect_ratio: aspectRatio } : {}),
     variables,
+    ...(Object.keys(actions).length > 0 ? { actions } : {}),
   };
 }
 

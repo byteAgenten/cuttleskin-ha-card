@@ -1,4 +1,5 @@
 import { parseGraphicConfigJson, type VariableConfig } from '@cuttleskin/runtime';
+import { ACTION_GESTURES, type ActionGesture } from './card-config';
 import { INTEGRATION_ENABLED } from './features';
 import type { HomeAssistant } from './hass';
 import { errorText, graphicPath, type IntegrationGraphic } from './integration';
@@ -10,20 +11,56 @@ const LOAD_DELAY = 400;
 const FORM_TIMEOUT = 3000;
 /** Prefix of the flat form field names for variables, e.g. `var:speed`. */
 const VARIABLE_FIELD = 'var:';
+/** Prefix of the form sections for the actions of an element, e.g. `act:livingRoomLamp`. */
+const ACTION_FIELD = 'act:';
 
-/** Texts of the fixed form fields. */
+/** Texts of the fixed form fields and of the fields in an action section. */
 const LABELS: Readonly<Record<string, MessageKey>> = {
   graphic: 'labelGraphic',
   svg: 'labelSvg',
   config: 'labelConfig',
   aspect_ratio: 'labelAspectRatio',
+  entity: 'labelActionEntity',
+  tap_action: 'labelTapAction',
+  hold_action: 'labelHoldAction',
+  double_tap_action: 'labelDoubleTapAction',
 };
 
-/** Field description for `ha-form`; `selector` is one of Home Assistant's selectors. */
+/**
+ * Field description for `ha-form`: a field with one of Home Assistant's selectors, or an
+ * `expandable` section whose fields are stored as an object under its name.
+ */
 interface FormField {
   readonly name: string;
   readonly required?: boolean;
-  readonly selector: Readonly<Record<string, unknown>>;
+  readonly selector?: Readonly<Record<string, unknown>>;
+  readonly type?: 'expandable';
+  readonly title?: string;
+  readonly schema?: readonly FormField[];
+}
+
+/** Event of the graphic each gesture belongs to; only gestures of reported events are offered. */
+const GESTURE_EVENTS: Readonly<Record<ActionGesture, string>> = {
+  tap_action: 'click',
+  hold_action: 'pointerdown',
+  double_tap_action: 'dblclick',
+};
+
+/** Element of the graphic that can get actions, with the gestures its events allow. */
+interface ActionElement {
+  readonly name: string;
+  readonly gestures: readonly ActionGesture[];
+}
+
+/**
+ * Fields of the section for one element: the entity for actions without their own, and its
+ * gestures with Home Assistant's action selector (as in the editors of its own cards).
+ */
+function actionSectionFields(gestures: readonly ActionGesture[]): FormField[] {
+  return [
+    { name: 'entity', selector: { entity: {} } },
+    ...gestures.map((gesture) => ({ name: gesture, selector: { ui_action: {} } })),
+  ];
 }
 
 /** Home Assistant's form element. Not a documented API; only these properties are used. */
@@ -84,13 +121,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Visual editor of the card. Fetches the cuttleskin configuration and shows one entity picker per
- * variable. Reports every change as `config-changed` with the complete configuration.
+ * variable and, per element the graphic reports events for, a section with its actions. Reports
+ * every change as `config-changed` with the complete configuration.
  */
 export class CuttleskinCardEditor extends HTMLElement {
   #config: Record<string, unknown> = {};
   #hass: HomeAssistant | undefined;
   #form: HaForm | undefined;
   #variables: readonly VariableConfig[] = [];
+  /** Elements the graphic reports tap, hold or double tap events for; each gets a section. */
+  #actionElements: readonly ActionElement[] = [];
   #loadedUrl: string | undefined;
   #loadError: string | undefined;
   #loadTimer: ReturnType<typeof setTimeout> | undefined;
@@ -158,10 +198,20 @@ export class CuttleskinCardEditor extends HTMLElement {
   async #loadVariables(source: string): Promise<void> {
     this.#loadedUrl = source;
     let variables: readonly VariableConfig[] = [];
+    let actionElements: readonly ActionElement[] = [];
     let error: string | undefined;
     if (source !== '') {
       try {
-        variables = parseGraphicConfigJson(await this.#configText(source)).config.variables;
+        const { config } = parseGraphicConfigJson(await this.#configText(source));
+        variables = config.variables;
+        actionElements = (config.elements ?? [])
+          .map((element) => ({
+            name: element.name ?? element.id,
+            gestures: ACTION_GESTURES.filter((gesture) =>
+              (element.events ?? []).includes(GESTURE_EVENTS[gesture]),
+            ),
+          }))
+          .filter((element) => element.gestures.length > 0);
       } catch (cause) {
         error = this.#text('configUnreadable', { reason: errorText(cause) });
       }
@@ -169,6 +219,7 @@ export class CuttleskinCardEditor extends HTMLElement {
     // A newer source was entered meanwhile
     if (source !== this.#loadedUrl) return;
     this.#variables = variables;
+    this.#actionElements = actionElements;
     this.#loadError = error;
     this.#render();
   }
@@ -215,6 +266,12 @@ export class CuttleskinCardEditor extends HTMLElement {
         name: `${VARIABLE_FIELD}${variable.name}`,
         selector: { entity: {} },
       })),
+      ...this.#actionElements.map(({ name, gestures }): FormField => ({
+        type: 'expandable',
+        name: `${ACTION_FIELD}${name}`,
+        title: this.#text('actionsOf', { name }),
+        schema: actionSectionFields(gestures),
+      })),
     ];
   }
 
@@ -251,7 +308,36 @@ export class CuttleskinCardEditor extends HTMLElement {
       data[`${VARIABLE_FIELD}${variable.name}`] =
         typeof source === 'string' ? source : isRecord(source) ? source.entity : undefined;
     }
+    const actions = isRecord(this.#config.actions) ? this.#config.actions : {};
+    for (const { name } of this.#actionElements) {
+      const entry = actions[name];
+      data[`${ACTION_FIELD}${name}`] = isRecord(entry) ? entry : {};
+    }
     return data;
+  }
+
+  /**
+   * Actions from the form: one entry per element section with at least one field set; entries
+   * of elements the loaded configuration does not (yet) list are kept.
+   */
+  #formActions(value: Record<string, unknown>): Record<string, unknown> {
+    const previous = isRecord(this.#config.actions) ? this.#config.actions : {};
+    const actions: Record<string, unknown> = {};
+    const shown = new Set(this.#actionElements.map((element) => element.name));
+    for (const [name, entry] of Object.entries(previous)) {
+      if (!shown.has(name)) actions[name] = entry;
+    }
+    for (const name of shown) {
+      const section = value[`${ACTION_FIELD}${name}`];
+      if (!isRecord(section)) continue;
+      const entry = Object.fromEntries(
+        Object.entries(section).filter(
+          ([, field]) => field !== undefined && field !== null && field !== '',
+        ),
+      );
+      if (Object.keys(entry).length > 0) actions[name] = entry;
+    }
+    return actions;
   }
 
   #changed(value: Record<string, unknown>): void {
@@ -275,6 +361,9 @@ export class CuttleskinCardEditor extends HTMLElement {
       config: value.config,
       variables,
     };
+    const actions = this.#formActions(value);
+    if (Object.keys(actions).length > 0) config.actions = actions;
+    else delete config.actions;
     // Only one source is written: the portal graphic replaces the file URLs
     if (typeof value.graphic === 'string' && value.graphic.trim() !== '') {
       config.graphic = value.graphic.trim();

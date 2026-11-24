@@ -1,6 +1,6 @@
 {
   "name": "cuttleskin-ha-card",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Home Assistant dashboard card that shows a cuttleskin graphic driven by entity states",
   "license": "MIT",
