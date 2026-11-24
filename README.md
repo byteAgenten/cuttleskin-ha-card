@@ -1,3 +1,5 @@
+<img src="brand/icon.png" alt="cuttleskin" width="96" align="right">
+
 # cuttleskin card for Home Assistant
 
 Dashboard card `custom:cuttleskin-card` that shows a **cuttleskin graphic** – an animated,
@@ -9,11 +11,20 @@ The cuttleskin runtime is built in; the card is a single file without further de
 
 ## Install
 
-### HACS
+### Marketplace (Home Assistant 2026.11 and later)
 
-1. HACS → menu (top right) → **Custom repositories**.
-2. Repository: `https://github.com/byteAgenten/cuttleskin-ha-card`, type: **Dashboard**.
+1. **Settings → Marketplace → Add from link** (top right).
+2. GitHub link: `byteAgenten/cuttleskin-ha-card`. If asked for the type, choose **Dashboard**.
 3. Install **cuttleskin card** and reload the browser.
+
+The Marketplace adds the dashboard resource itself
+(`/local/community/cuttleskin-ha-card/cuttleskin-ha-card.js`).
+
+### HACS (before Home Assistant 2026.11)
+
+HACS → menu (top right) → **Custom repositories** → repository
+`https://github.com/byteAgenten/cuttleskin-ha-card`, type **Dashboard**, then install
+**cuttleskin card**.
 
 ### Manually
 
@@ -27,6 +38,36 @@ The cuttleskin runtime is built in; the card is a single file without further de
    e.g. `/local/cuttleskin-ha-card.js?v=2`.
 
 Afterwards **cuttleskin** appears in the card picker under the community cards.
+
+## Get a graphic
+
+A cuttleskin graphic consists of an SVG and a configuration that binds variables to elements of
+the SVG (rotation, position, scale, colour, opacity, text). There are three ways to get one:
+
+### Download a public graphic
+
+Browse the public graphics at [cuttleskin.com](https://cuttleskin.com), open one and click
+**Export**. No account is needed. Public graphics may be used freely, also commercially.
+
+### Draw it yourself and configure it in the editor
+
+1. Draw the graphic in an SVG drawing program such as Adobe Illustrator, Affinity Designer or
+   Inkscape. Give every element that is to move or change a unique ID (depending on the program the object ID or the layer name) and
+   group parts that move together.
+2. Save it as SVG, sign in at [cuttleskin.com](https://cuttleskin.com) and create a new graphic
+   with the SVG.
+3. In the editor, add the variables (e.g. `temperature` from −20 to 50) and the transformations
+   for each element, and check the result with the playhead.
+4. Click **Export**.
+
+### Let Claude create it
+
+The Claude skill [cuttleskin-skill](https://github.com/byteAgenten/cuttleskin-skill) draws the SVG
+and writes the configuration from a description, e.g. "a gauge for the living room temperature
+from −20 to 50 °C". It validates the result and documents the variables. Installation for Claude
+Code and the Claude apps is described in the skill repository. Paste the result into a new graphic
+at [cuttleskin.com](https://cuttleskin.com) to review and fine-tune it in the editor, then export
+it.
 
 ## Add a graphic
 
