@@ -1,0 +1,21 @@
+# Checks the repository with the rules of the Home Assistant Marketplace / HACS default catalog
+# (https://www.hacs.xyz/docs/publish/action/). A passing run is required for the inclusion.
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  validate-hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: HACS validation
+        uses: hacs/action@main
+        with:
+          category: plugin

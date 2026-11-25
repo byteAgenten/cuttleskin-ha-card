@@ -9,6 +9,8 @@ from the states of Home Assistant entities.
 Create and export the graphics in the cuttleskin editor at [cuttleskin.com](https://cuttleskin.com).
 The cuttleskin runtime is built in; the card is a single file without further dependencies.
 
+![Six cuttleskin graphics on a dashboard: chronograph, climate display, race track, metro map, pixel-art speedometer and solar system](docs/examples.png)
+
 ## Install
 
 ### Marketplace (Home Assistant 2026.11 and later)
