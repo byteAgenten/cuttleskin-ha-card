@@ -49,7 +49,7 @@ the SVG (rotation, position, scale, colour, opacity, text). There are three ways
 ### Download a public graphic
 
 Browse the public graphics at [cuttleskin.com](https://cuttleskin.com), open one and click
-**Export**. No account is needed. Public graphics may be used freely, also commercially.
+**Export**. Exporting needs a free account. Public graphics may be used freely, also commercially.
 
 ### Draw it yourself and configure it in the editor
 
