@@ -187,8 +187,17 @@ actions:
   only.
 - The visual editor uses Home Assistant's internal `ha-form` element. If it is not available, use
   the code editor.
-- The graphic is inserted into the Home Assistant interface (inside the card's shadow DOM). Only
-  use graphics from trusted sources; SVGs are not sanitized.
+
+## Security
+
+The graphic is inserted into the Home Assistant interface (inside the card's shadow DOM). The
+runtime sanitizes every SVG first (`vendor/cuttleskin-runtime/src/document/sanitize.ts`):
+
+- `<script>`, `<foreignObject>` and elements outside the SVG namespace are removed.
+- Event handler attributes (`onload`, `onclick`, …) are removed.
+- Links and image references keep only relative URLs, `http(s):`, `blob:` and image data URLs;
+  `javascript:` and other schemes are dropped, also for image URLs set from entity states.
+- SMIL animations that would set an event handler or a link are removed.
 
 ## Build from source
 
@@ -197,8 +206,9 @@ npm install
 npm run build   # → dist/cuttleskin-ha-card.js
 ```
 
-The card's source is in `src/`. The cuttleskin runtime is included prebuilt in `vendor/`
-(minified and obfuscated) with its type declarations.
+The card's source is in `src/`. The cuttleskin runtime is in `vendor/cuttleskin-runtime/` as
+source, a copy of [cuttleskin-runtime](https://github.com/byteAgenten/cuttleskin-runtime). The
+bundle is built from both without obfuscation.
 
 ## License
 

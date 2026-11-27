@@ -12,8 +12,9 @@
     "skipLibCheck": true,
     "noEmit": true,
     "paths": {
-      "@cuttleskin/runtime": ["./vendor/cuttleskin-runtime.d.ts"]
+      "@cuttleskin/runtime": ["./vendor/cuttleskin-runtime/src/index.ts"],
+      "@cuttleskin/config": ["./vendor/cuttleskin-runtime/config/index.ts"]
     }
   },
-  "include": ["src", "tsdown.config.ts"]
+  "include": ["src", "vendor"]
 }

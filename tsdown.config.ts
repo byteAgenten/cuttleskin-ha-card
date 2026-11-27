@@ -1,9 +1,12 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'tsdown';
 
+const source = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+
 /**
  * One self-contained ES module for Home Assistant: `dist/cuttleskin-ha-card.js`. The cuttleskin
- * runtime comes prebuilt (minified and obfuscated) from `vendor/` and is bundled in.
+ * runtime is built in from its source in `vendor/cuttleskin-runtime/` (a copy of
+ * https://github.com/byteAgenten/cuttleskin-runtime), without obfuscation.
  */
 export default defineConfig({
   entry: { 'cuttleskin-ha-card': 'src/index.ts' },
@@ -13,10 +16,11 @@ export default defineConfig({
   minify: true,
   sourcemap: false,
   dts: false,
-  // The `paths` of tsconfig.json point at the type declarations; bundling uses the alias
+  // The `paths` of tsconfig.json are for type checking; bundling uses the alias
   tsconfig: false,
   alias: {
-    '@cuttleskin/runtime': fileURLToPath(new URL('vendor/cuttleskin-runtime.js', import.meta.url)),
+    '@cuttleskin/runtime': source('vendor/cuttleskin-runtime/src/index.ts'),
+    '@cuttleskin/config': source('vendor/cuttleskin-runtime/config/index.ts'),
   },
   // Home Assistant serves `/local/*.js` as JavaScript; `.mjs` is not needed
   outExtensions: () => ({ js: '.js' }),
